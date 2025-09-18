@@ -40,7 +40,7 @@ let dataStore: DataRow[] = [
     responsible: "Compliance Unit, PMU M&E Specialist",
     disaggregation: "EEZ, Territorial waters",
     notes: "Sample data for testing",
-    status: "submitted",
+    status: "draft",
     savedAt: new Date().toISOString(),
     submitterMessage: "",
     reviewerMessage: "",
@@ -50,8 +50,10 @@ let dataStore: DataRow[] = [
 ];
 
 export async function addRow(row: DataRow) {
+  console.log("Adding row to storage:", row);
   dataStore.push(row);
   console.log("Added row:", row.id, "Total rows:", dataStore.length);
+  console.log("Current dataStore:", dataStore);
 }
 
 export async function getRows(): Promise<DataRow[]> {
