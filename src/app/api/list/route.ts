@@ -12,19 +12,27 @@ export async function GET(req: Request) {
   
   try {
     const allItems = getRows();
+    console.log("All items in storage:", allItems.length);
+    console.log("User:", user.email, "Role:", user.role);
+    console.log("Requested status:", status, "All statuses:", allStatuses);
     
     // Filter by status, user role, and data presence
     const filteredItems = allItems.filter(item => {
       const hasData = item.value && item.value.trim() !== "" && 
                      item.savedAt && item.savedAt.trim() !== "";
       
-      if (!hasData) return false;
+      if (!hasData) {
+        console.log("Item filtered out - no data:", item.id);
+        return false;
+      }
       
       const statusMatch = allStatuses || item.status === status;
       const roleMatch = 
         (user.role === "submitter" && item.user === user.email) ||
         (user.role === "reviewer" && (allStatuses || status === "submitted" || item.status === "reviewed" || item.status === "rejected")) ||
         (user.role === "approver" && (allStatuses || status === "reviewed" || status === "submitted"));
+      
+      console.log(`Item ${item.id}: statusMatch=${statusMatch}, roleMatch=${roleMatch}, status=${item.status}, user=${item.user}`);
       
       return statusMatch && roleMatch;
     });
