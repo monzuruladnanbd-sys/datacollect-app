@@ -70,7 +70,8 @@ export async function appendRow(payload: {
 
 export async function getWorkbookBuffer(indicatorId: string): Promise<Buffer> {
   const wb = memoryStore[indicatorId] || await ensureWorkbook();
-  return await wb.xlsx.writeBuffer();
+  const buffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(buffer);
 }
 
 export async function getAllWorkbooks(): Promise<{ [key: string]: ExcelJS.Workbook }> {
