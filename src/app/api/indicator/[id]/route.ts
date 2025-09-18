@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: { indicatorId
       user: user.email,
     };
 
-    addRow(dataRow);
+    await addRow(dataRow);
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {

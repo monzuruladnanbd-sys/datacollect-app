@@ -42,7 +42,7 @@ export async function saveRows(rows: RowPayload[]) {
     const now = new Date().toISOString();
 
     for (const r of normalized) {
-      addRow({
+      await addRow({
         id: r.id,
         section: r.section,
         level: r.level,

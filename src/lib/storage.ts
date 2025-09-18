@@ -1,4 +1,7 @@
-// Simple in-memory storage for serverless environment
+// Simple file-based storage for Vercel deployment
+import { promises as fs } from 'fs';
+import path from 'path';
+
 interface DataRow {
   id: string;
   section: string;
@@ -21,36 +24,65 @@ interface DataRow {
   user: string;
 }
 
-// In-memory storage
-let dataStore: DataRow[] = [];
+const DATA_FILE = path.join(process.cwd(), 'data.json');
 
-export function addRow(row: DataRow) {
-  dataStore.push(row);
-}
-
-export function getRows(): DataRow[] {
-  return dataStore;
-}
-
-export function updateRow(id: string, updates: Partial<DataRow>) {
-  const index = dataStore.findIndex(row => row.id === id);
-  if (index !== -1) {
-    dataStore[index] = { ...dataStore[index], ...updates };
+async function ensureDataFile() {
+  try {
+    await fs.access(DATA_FILE);
+  } catch {
+    await fs.writeFile(DATA_FILE, JSON.stringify([]));
   }
 }
 
-export function getRowById(id: string): DataRow | undefined {
-  return dataStore.find(row => row.id === id);
+async function readData(): Promise<DataRow[]> {
+  try {
+    await ensureDataFile();
+    const data = await fs.readFile(DATA_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
 }
 
-export function getRowsByStatus(status: string): DataRow[] {
-  return dataStore.filter(row => row.status === status);
+async function writeData(data: DataRow[]) {
+  await ensureDataFile();
+  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
-export function getRowsByUser(user: string): DataRow[] {
-  return dataStore.filter(row => row.user === user);
+export async function addRow(row: DataRow) {
+  const data = await readData();
+  data.push(row);
+  await writeData(data);
 }
 
-export function clearData() {
-  dataStore = [];
+export async function getRows(): Promise<DataRow[]> {
+  return await readData();
+}
+
+export async function updateRow(id: string, updates: Partial<DataRow>) {
+  const data = await readData();
+  const index = data.findIndex(row => row.id === id);
+  if (index !== -1) {
+    data[index] = { ...data[index], ...updates };
+    await writeData(data);
+  }
+}
+
+export async function getRowById(id: string): Promise<DataRow | undefined> {
+  const data = await readData();
+  return data.find(row => row.id === id);
+}
+
+export async function getRowsByStatus(status: string): Promise<DataRow[]> {
+  const data = await readData();
+  return data.filter(row => row.status === status);
+}
+
+export async function getRowsByUser(user: string): Promise<DataRow[]> {
+  const data = await readData();
+  return data.filter(row => row.user === user);
+}
+
+export async function clearData() {
+  await writeData([]);
 }

@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   const allStatuses = url.searchParams.get("all") === "true";
   
   try {
-    const allItems = getRows();
+    const allItems = await getRows();
     console.log("All items in storage:", allItems.length);
     console.log("User:", user.email, "Role:", user.role);
     console.log("Requested status:", status, "All statuses:", allStatuses);
