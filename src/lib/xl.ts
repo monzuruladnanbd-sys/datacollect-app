@@ -1,16 +1,10 @@
 import ExcelJS from "exceljs";
-import path from "path";
-import fs from "fs/promises";
 
-const FILE = path.join(process.cwd(), "data", "submissions.xlsx");
-const dir = path.dirname(FILE);
+// In-memory storage for serverless environment
+let memoryStore: { [key: string]: ExcelJS.Workbook } = {};
 
 export async function ensureWorkbook() {
-  await fs.mkdir(dir, { recursive: true });
   const wb = new ExcelJS.Workbook();
-  try { await wb.xlsx.readFile(FILE); }
-  catch { await wb.xlsx.writeFile(FILE); }   // create empty
-  await wb.xlsx.readFile(FILE);
   return wb;
 }
 
@@ -69,5 +63,16 @@ export async function appendRow(payload: {
     reviewer_msg: payload.reviewerMessage ?? "",
     approver_msg: payload.approverMessage ?? "",
   });
-  await wb.xlsx.writeFile(FILE);
+  
+  // Store in memory for this session
+  memoryStore[payload.indicatorId] = wb;
+}
+
+export async function getWorkbookBuffer(indicatorId: string): Promise<Buffer> {
+  const wb = memoryStore[indicatorId] || await ensureWorkbook();
+  return await wb.xlsx.writeBuffer();
+}
+
+export async function getAllWorkbooks(): Promise<{ [key: string]: ExcelJS.Workbook }> {
+  return memoryStore;
 }

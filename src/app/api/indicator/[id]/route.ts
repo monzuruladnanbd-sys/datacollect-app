@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { appendRow } from "@/lib/xl";
-// If you don't use sessions, remove these two lines:
-import { getIronSession } from "iron-session";
-import { sessionOptions } from "@/lib/session";
+import { addRow } from "@/lib/storage";
+import { getSession } from "@/lib/auth";
 
 export async function POST(req: NextRequest, { params }: { params: { indicatorId: string } }) {
   try {
+    const { user } = await getSession();
+    if (!user) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+
     const body = await req.json();
 
     const status = body?.status === "draft" ? "draft" : "submitted";
@@ -24,30 +25,35 @@ export async function POST(req: NextRequest, { params }: { params: { indicatorId
       value = Number.isFinite(n) ? n : null;
     }
 
-    // optional user
-    let user: string | null = null;
-    try {
-      const session = await getIronSession<any>(req as any, {} as any, sessionOptions);
-      user = session?.user?.email ?? null;
-    } catch {}
+    // Create a data row
+    const dataRow = {
+      id: params.indicatorId,
+      section: "Fisheries Management", // Default section
+      level: "Project",
+      label: `Indicator ${params.indicatorId}`,
+      value: typeof value === "boolean" ? (value ? "Yes" : "No") : (value?.toString() ?? ""),
+      unit: unit,
+      frequency: frequency,
+      period: period,
+      year: new Date().getFullYear().toString(),
+      quarter: "Q1", // Default quarter
+      responsible: responsible.join(", "),
+      disaggregation: disaggregation.join(", "),
+      notes: notes,
+      status: status,
+      savedAt: new Date().toISOString(),
+      submitterMessage: "",
+      reviewerMessage: "",
+      approverMessage: "",
+      user: user.email,
+    };
 
-    await appendRow({
-      indicatorId: params.indicatorId,
-      status,
-      value,
-      unit,
-      frequency,
-      period,
-      responsible,
-      disaggregation,
-      notes,
-      user,
-    });
+    addRow(dataRow);
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json(
-      { ok:false, error: e?.message ?? "Failed to save" },
+      { ok: false, error: e?.message ?? "Failed to save" },
       { status: 500 }
     );
   }
