@@ -1,6 +1,5 @@
-// Simple file-based storage for Vercel deployment
-import { promises as fs } from 'fs';
-import path from 'path';
+// Simple in-memory storage that persists during the function execution
+// This works better with Vercel's serverless environment
 
 interface DataRow {
   id: string;
@@ -24,65 +23,63 @@ interface DataRow {
   user: string;
 }
 
-const DATA_FILE = path.join(process.cwd(), 'data.json');
-
-async function ensureDataFile() {
-  try {
-    await fs.access(DATA_FILE);
-  } catch {
-    await fs.writeFile(DATA_FILE, JSON.stringify([]));
+// Global variable to store data during function execution
+let dataStore: DataRow[] = [
+  // Sample data for testing
+  {
+    id: "FM-P-001",
+    section: "Fisheries Management",
+    level: "Project",
+    label: "At-sea patrol missions / vessel inspections",
+    value: "5",
+    unit: "missions",
+    frequency: "Quarterly",
+    period: "2024 Q1",
+    year: "2024",
+    quarter: "Q1",
+    responsible: "Compliance Unit, PMU M&E Specialist",
+    disaggregation: "EEZ, Territorial waters",
+    notes: "Sample data for testing",
+    status: "submitted",
+    savedAt: new Date().toISOString(),
+    submitterMessage: "",
+    reviewerMessage: "",
+    approverMessage: "",
+    user: "submitter@example.com"
   }
-}
-
-async function readData(): Promise<DataRow[]> {
-  try {
-    await ensureDataFile();
-    const data = await fs.readFile(DATA_FILE, 'utf8');
-    return JSON.parse(data);
-  } catch {
-    return [];
-  }
-}
-
-async function writeData(data: DataRow[]) {
-  await ensureDataFile();
-  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
-}
+];
 
 export async function addRow(row: DataRow) {
-  const data = await readData();
-  data.push(row);
-  await writeData(data);
+  dataStore.push(row);
+  console.log("Added row:", row.id, "Total rows:", dataStore.length);
 }
 
 export async function getRows(): Promise<DataRow[]> {
-  return await readData();
+  console.log("Retrieved rows:", dataStore.length);
+  return dataStore;
 }
 
 export async function updateRow(id: string, updates: Partial<DataRow>) {
-  const data = await readData();
-  const index = data.findIndex(row => row.id === id);
+  const index = dataStore.findIndex(row => row.id === id);
   if (index !== -1) {
-    data[index] = { ...data[index], ...updates };
-    await writeData(data);
+    dataStore[index] = { ...dataStore[index], ...updates };
+    console.log("Updated row:", id);
   }
 }
 
 export async function getRowById(id: string): Promise<DataRow | undefined> {
-  const data = await readData();
-  return data.find(row => row.id === id);
+  return dataStore.find(row => row.id === id);
 }
 
 export async function getRowsByStatus(status: string): Promise<DataRow[]> {
-  const data = await readData();
-  return data.filter(row => row.status === status);
+  return dataStore.filter(row => row.status === status);
 }
 
 export async function getRowsByUser(user: string): Promise<DataRow[]> {
-  const data = await readData();
-  return data.filter(row => row.user === user);
+  return dataStore.filter(row => row.user === user);
 }
 
 export async function clearData() {
-  await writeData([]);
+  dataStore = [];
+  console.log("Cleared all data");
 }
