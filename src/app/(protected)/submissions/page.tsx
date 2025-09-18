@@ -43,9 +43,38 @@ export default function SubmissionsPage() {
   const loadItems = async () => {
     setLoading(true);
     try {
-      // Use localStorage for immediate functionality
-      const { getStoredData } = await import('@/lib/client-storage');
-      const allData = getStoredData();
+      // Read directly from localStorage
+      let stored = localStorage.getItem('datacollect_submissions');
+      
+      // If no data, create sample data
+      if (!stored) {
+        const sampleData = [{
+          id: "FM-P-001",
+          section: "Fisheries Management",
+          level: "Project",
+          label: "At-sea patrol missions / vessel inspections",
+          value: "5",
+          unit: "missions",
+          frequency: "Quarterly",
+          period: "2024 Q1",
+          year: "2024",
+          quarter: "Q1",
+          responsible: "Compliance Unit, PMU M&E Specialist",
+          disaggregation: "EEZ, Territorial waters",
+          notes: "Sample data for testing",
+          status: "draft",
+          savedAt: new Date().toISOString(),
+          submitterMessage: "",
+          reviewerMessage: "",
+          approverMessage: "",
+          user: "submitter@example.com"
+        }];
+        localStorage.setItem('datacollect_submissions', JSON.stringify(sampleData));
+        stored = JSON.stringify(sampleData);
+      }
+      
+      const allData = JSON.parse(stored);
+      console.log('Loaded from localStorage:', allData);
       setAllItems(allData);
       
       // Filter by active tab
