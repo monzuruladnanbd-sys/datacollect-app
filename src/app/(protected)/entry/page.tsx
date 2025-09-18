@@ -139,15 +139,56 @@ export default function DataEntryPage() {
         return;
       }
 
-      const result = await saveRows(rows);
-      if (!result.ok) {
-        throw new Error(result.error || "Failed to save data");
+      try {
+        // Try to save to server
+        const result = await saveRows(rows);
+        if (!result.ok) {
+          throw new Error(result.error || "Failed to save data");
+        }
+      } catch (serverError) {
+        console.warn("Server save failed, using localStorage:", serverError);
+      }
+
+      // Always save to localStorage as backup
+      try {
+        const existingData = JSON.parse(localStorage.getItem('datacollect_submissions') || '[]');
+        
+        rows.forEach(row => {
+          const dataRow = {
+            id: row.id,
+            section: row.section,
+            level: row.level,
+            label: row.label,
+            value: typeof row.value === "boolean" ? (row.value ? "Yes" : "No") : (row.value?.toString() ?? ""),
+            unit: row.unit || "",
+            frequency: row.frequency || "",
+            period: row.period || "",
+            year: new Date().getFullYear().toString(),
+            quarter: "Q1",
+            responsible: Array.isArray(row.responsible) ? row.responsible.join(", ") : (row.responsible || ""),
+            disaggregation: Array.isArray(row.disaggregation) ? row.disaggregation.join(", ") : (row.disaggregation || ""),
+            notes: row.notes || "",
+            status: status,
+            savedAt: new Date().toISOString(),
+            submitterMessage: "",
+            reviewerMessage: "",
+            approverMessage: "",
+            user: "submitter@example.com"
+          };
+          
+          existingData.push(dataRow);
+        });
+        
+        localStorage.setItem('datacollect_submissions', JSON.stringify(existingData));
+        console.log('Data saved to localStorage:', rows.length, 'rows');
+      } catch (localError) {
+        console.error('localStorage save failed:', localError);
       }
 
       // Show success message
       Object.keys(state).forEach(id => {
         updateRow(id, { 
-          statusMsg: status === "draft" ? "Draft saved" : "Submitted",
+          statusMsg: status === "draft" ? "Draft saved to localStorage" : "Submitted to localStorage",
           saving: false 
         });
         setTimeout(() => updateRow(id, { statusMsg: undefined }), 3000);
