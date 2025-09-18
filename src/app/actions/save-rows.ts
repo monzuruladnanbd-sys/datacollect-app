@@ -1,7 +1,5 @@
 "use server";
-import ExcelJS from "exceljs";
-import path from "node:path";
-import { promises as fs } from "node:fs";
+import { addRow } from "@/lib/storage";
 import { s, a, yearFromPeriod, quarterFromPeriod } from "@/lib/safe";
 
 type RowPayload = {
@@ -9,7 +7,6 @@ type RowPayload = {
   section: string;
   level: "process" | "output" | "outcome";
   label: string;
-
   value: number | string | boolean | null;
   unit?: string;
   frequency?: string;
@@ -42,45 +39,31 @@ export async function saveRows(rows: RowPayload[]) {
       }
     });
 
-    const file = path.join(process.cwd(), "data", "submissions.xlsx");
-    const wb = new ExcelJS.Workbook();
-
-    try {
-      await wb.xlsx.readFile(file);
-    } catch {
-      const ws = wb.addWorksheet("Entries");
-      ws.addRow([
-        "ID","Section","Level","Label","Value","Unit","Frequency",
-        "Period","Year","Quarter","Responsible","Disaggregation",
-        "Notes","Status","SavedAt",
-      ]);
-    }
-
-    const ws = wb.getWorksheet("Entries") ?? wb.addWorksheet("Entries");
     const now = new Date().toISOString();
 
     for (const r of normalized) {
-      ws.addRow([
-        r.id,
-        r.section,
-        r.level,
-        r.label,
-        typeof r.value === "boolean" ? (r.value ? "Yes" : "No") : r.value ?? "",
-        r.unit,
-        r.frequency,
-        r.period,
-        r._year,
-        r._quarter,
-        r.responsible.join(", "),
-        r.disaggregation.join(", "),
-        r.notes,
-        r.status,
-        now,
-      ]);
+      addRow({
+        id: r.id,
+        section: r.section,
+        level: r.level,
+        label: r.label,
+        value: typeof r.value === "boolean" ? (r.value ? "Yes" : "No") : (r.value?.toString() ?? ""),
+        unit: r.unit,
+        frequency: r.frequency,
+        period: r.period,
+        year: r._year,
+        quarter: r._quarter,
+        responsible: r.responsible.join(", "),
+        disaggregation: r.disaggregation.join(", "),
+        notes: r.notes,
+        status: r.status,
+        savedAt: now,
+        submitterMessage: "",
+        reviewerMessage: "",
+        approverMessage: "",
+        user: "system", // Default user for server actions
+      });
     }
-
-    await fs.mkdir(path.dirname(file), { recursive: true });
-    await wb.xlsx.writeFile(file);
 
     return { ok: true };
   } catch (err: any) {
