@@ -13,6 +13,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
           <nav className="flex gap-4">
             <Link href="/dashboard" className="font-semibold">Dashboard</Link>
             <Link href="/dashboard-performance">Performance Dashboard</Link>
+        <Link href="/test-storage" className="bg-yellow-500 text-white px-2 py-1 rounded text-sm">🧪 Test Storage</Link>
             {user.role==="submitter" && <Link href="/entry">Data Entry</Link>}
             {user.role==="submitter" && <Link href="/submissions">My Submissions</Link>}
             {user.role==="reviewer" && <Link href="/review">Review</Link>}
