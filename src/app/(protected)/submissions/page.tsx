@@ -43,9 +43,9 @@ export default function SubmissionsPage() {
   const loadItems = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/list/?status=submitted&all=true`);
-      const j = await res.json();
-      const allData = j.items || [];
+      // Use localStorage for immediate functionality
+      const { getStoredData } = await import('@/lib/client-storage');
+      const allData = getStoredData();
       setAllItems(allData);
       
       // Filter by active tab

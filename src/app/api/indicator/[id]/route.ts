@@ -50,7 +50,8 @@ export async function POST(req: NextRequest, { params }: { params: { indicatorId
 
     await addRow(dataRow);
 
-    return NextResponse.json({ ok: true });
+    // Also return the data for client-side storage
+    return NextResponse.json({ ok: true, data: dataRow });
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e?.message ?? "Failed to save" },
