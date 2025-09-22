@@ -138,6 +138,12 @@ export default function AdminPage() {
           <p className="text-gray-600">Manage system users and their roles</p>
         </div>
         <div className="flex gap-3">
+          <a
+            href="/admin/pending-users"
+            className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700"
+          >
+            Pending Approvals
+          </a>
           <button
             onClick={() => {
               setShowAddForm(true);

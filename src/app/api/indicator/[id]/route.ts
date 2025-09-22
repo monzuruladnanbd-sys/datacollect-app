@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addRow } from "@/lib/storage";
 import { getSession } from "@/lib/auth";
+import { RoundRobinService } from "@/lib/round-robin";
 
 export async function POST(req: NextRequest, { params }: { params: { indicatorId: string } }) {
   try {
@@ -25,7 +26,23 @@ export async function POST(req: NextRequest, { params }: { params: { indicatorId
       value = Number.isFinite(n) ? n : null;
     }
 
-    // Create a data row
+    // If submitting for review, assign a reviewer using round-robin
+    let assignedReviewer = null;
+    let assignedApprover = null;
+    
+    if (status === "submitted") {
+      console.log('🔄 Submitting for review, assigning reviewer...');
+      assignedReviewer = await RoundRobinService.getNextReviewer();
+      
+      if (assignedReviewer) {
+        console.log('✅ Assigned reviewer:', assignedReviewer);
+      } else {
+        console.log('⚠️ No reviewer available for assignment');
+      }
+    }
+
+    // Create a data row with user tracking
+    const currentTimestamp = new Date().toISOString();
     const dataRow = {
       id: params.indicatorId,
       section: "Fisheries Management", // Default section
@@ -40,12 +57,17 @@ export async function POST(req: NextRequest, { params }: { params: { indicatorId
       responsible: responsible.join(", "),
       disaggregation: disaggregation.join(", "),
       notes: notes,
-      status: status,
-      savedAt: new Date().toISOString(),
+      status: status as 'draft' | 'submitted' | 'reviewed' | 'approved' | 'rejected' | 'deleted',
+      savedAt: currentTimestamp,
       submitterMessage: "",
       reviewerMessage: "",
       approverMessage: "",
       user: user.email,
+              assignedReviewer: assignedReviewer || undefined,
+              assignedApprover: assignedApprover || undefined,
+      // User tracking for initial creation/submission
+      submittedBy: status === "submitted" ? user.email : undefined,
+      submittedAt: status === "submitted" ? currentTimestamp : undefined,
     };
 
     await addRow(dataRow);

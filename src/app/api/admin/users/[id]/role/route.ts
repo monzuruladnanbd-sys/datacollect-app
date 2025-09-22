@@ -21,7 +21,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     }
 
     // Validate role
-    const validRoles = ["submitter", "reviewer", "approver"];
+    const validRoles = ["submitter", "reviewer", "approver", "admin"];
     if (!validRoles.includes(role)) {
       return NextResponse.json({ 
         ok: false, 
@@ -29,23 +29,30 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       }, { status: 400 });
     }
 
-    // Change user role
-    const result = changeUserRole(params.id, role);
+    // Use the users library function which has proper fallback
+    const result = await changeUserRole(params.id, role as any);
 
-    if (result.success) {
-      return NextResponse.json({
-        ok: true,
-        message: result.message,
-      });
-    } else {
+    if (!result.success) {
       return NextResponse.json({ 
         ok: false, 
         message: result.message 
       }, { status: 400 });
     }
+
+    return NextResponse.json({
+      ok: true,
+      message: result.message
+    });
   } catch (error) {
     console.error("Failed to change user role:", error);
     return NextResponse.json({ ok: false, message: "Failed to change user role" }, { status: 500 });
   }
 }
+
+
+
+
+
+
+
 

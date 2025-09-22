@@ -20,6 +20,25 @@ type Row = {
   submitterMessage: string;
   reviewerMessage: string;
   approverMessage: string;
+  user: string;
+  assignedReviewer?: string;
+  assignedApprover?: string;
+  // User tracking fields
+  submittedBy?: string;
+  reviewedBy?: string;
+  approvedBy?: string;
+  rejectedBy?: string;
+  deletedBy?: string;
+  restoredBy?: string;
+  editedBy?: string;
+  // Timestamp fields for each operation
+  submittedAt?: string;
+  reviewedAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  deletedAt?: string;
+  restoredAt?: string;
+  editedAt?: string;
 };
 
 export default function ApprovePage() {
@@ -28,7 +47,7 @@ export default function ApprovePage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected' | 'deleted'>('pending');
 
   useEffect(() => {
     loadItems();
@@ -41,9 +60,17 @@ export default function ApprovePage() {
   const loadItems = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/list/?status=reviewed&all=true`);
-      const j = await res.json();
-      const allData = j.items || [];
+      const res = await fetch(`/api/list/?all=true`);
+      const allData = await res.json();
+      console.log('Approve page loaded data:', allData);
+      console.log('Data length:', allData.length);
+      console.log('Records by status:', {
+        reviewed: allData.filter((item: Row) => item.status === 'reviewed').length,
+        approved: allData.filter((item: Row) => item.status === 'approved').length,
+        rejected: allData.filter((item: Row) => item.status === 'rejected').length,
+        deleted: allData.filter((item: Row) => item.status === 'deleted').length,
+        submitted: allData.filter((item: Row) => item.status === 'submitted').length
+      });
       setAllItems(allData);
       
       // Filter by active tab
@@ -51,8 +78,11 @@ export default function ApprovePage() {
         if (activeTab === 'pending') return item.status === 'reviewed';
         if (activeTab === 'approved') return item.status === 'approved';
         if (activeTab === 'rejected') return item.status === 'rejected';
+        if (activeTab === 'deleted') return item.status === 'deleted';
         return false;
       });
+      console.log('Filtered items for activeTab', activeTab, ':', filtered);
+      console.log('Items with reviewed status:', allData.filter((item: Row) => item.status === 'reviewed'));
       setItems(filtered);
     } catch (error) {
       console.error("Failed to load items:", error);
@@ -95,7 +125,17 @@ export default function ApprovePage() {
           type: 'success', 
           text: `Successfully ${decision} submission with message: "${note.trim()}"` 
         });
+        
         loadItems(); // Reload the list
+        
+        // Auto-switch to the correct tab after action (slight delay to ensure data is refreshed)
+        setTimeout(() => {
+          if (decision === "approved") {
+            setActiveTab("approved");
+          } else if (decision === "rejected") {
+            setActiveTab("rejected");
+          }
+        }, 500);
       } else {
         setMessage({ 
           type: 'error', 
@@ -113,6 +153,71 @@ export default function ApprovePage() {
       // Clear message after 5 seconds
       setTimeout(() => setMessage(null), 5000);
     }
+  };
+
+  const deleteRecord = async (item: Row) => {
+    if (!confirm(`Are you sure you want to delete this reviewed record: ${item.label}?`)) {
+      return;
+    }
+
+    setProcessingId(item.id);
+    setMessage(null);
+    
+    try {
+      const res = await fetch("/api/delete-record", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: item.id,
+          savedAt: item.savedAt
+        }),
+      });
+      
+      const result = await res.json();
+      
+      if (result.ok) {
+        setMessage({ type: 'success', text: 'Record deleted successfully' });
+        loadItems(); // Reload the list
+        setTimeout(() => setActiveTab("deleted"), 500); // Auto-switch to deleted tab
+      } else {
+        setMessage({ type: 'error', text: result.error || 'Failed to delete record' });
+      }
+    } catch (error) {
+      console.error("Failed to delete record:", error);
+      setMessage({ type: 'error', text: 'Failed to delete record' });
+    } finally {
+      setProcessingId(null);
+      setTimeout(() => setMessage(null), 5000);
+    }
+  };
+
+  // Helper function to format user tracking information
+  const formatUserTracking = (item: Row) => {
+    const tracking = [];
+    
+    if (item.submittedBy && item.submittedAt) {
+      tracking.push(`👤 Submitted by ${item.submittedBy} on ${new Date(item.submittedAt).toLocaleDateString()}`);
+    }
+    if (item.reviewedBy && item.reviewedAt) {
+      tracking.push(`👨‍💼 Reviewed by ${item.reviewedBy} on ${new Date(item.reviewedAt).toLocaleDateString()}`);
+    }
+    if (item.approvedBy && item.approvedAt) {
+      tracking.push(`👑 Approved by ${item.approvedBy} on ${new Date(item.approvedAt).toLocaleDateString()}`);
+    }
+    if (item.rejectedBy && item.rejectedAt) {
+      tracking.push(`❌ Rejected by ${item.rejectedBy} on ${new Date(item.rejectedAt).toLocaleDateString()}`);
+    }
+    if (item.deletedBy && item.deletedAt) {
+      tracking.push(`🗑️ Deleted by ${item.deletedBy} on ${new Date(item.deletedAt).toLocaleDateString()}`);
+    }
+    if (item.restoredBy && item.restoredAt) {
+      tracking.push(`↩️ Restored by ${item.restoredBy} on ${new Date(item.restoredAt).toLocaleDateString()}`);
+    }
+    if (item.editedBy && item.editedAt) {
+      tracking.push(`✏️ Edited by ${item.editedBy} on ${new Date(item.editedAt).toLocaleDateString()}`);
+    }
+    
+    return tracking;
   };
 
   if (loading) return <div className="p-4">Loading…</div>;
@@ -154,6 +259,16 @@ export default function ApprovePage() {
           >
             Rejected ({allItems.filter(item => item.status === 'rejected').length})
           </button>
+          <button
+            onClick={() => setActiveTab('deleted')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'deleted'
+                ? 'border-gray-500 text-gray-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Deleted ({allItems.filter(item => item.status === 'deleted').length})
+          </button>
         </nav>
       </div>
       
@@ -181,6 +296,13 @@ export default function ApprovePage() {
               <div className="text-sm text-gray-500">{item.id} • {item.section} • {item.level}</div>
               <div className="font-medium text-lg">{item.label}</div>
               <div className="text-xs text-gray-500">Submitted: {new Date(item.savedAt).toLocaleString()}</div>
+              {item.assignedApprover && (
+                <div className="mt-2">
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    👑 Assigned to: {item.assignedApprover}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
               {item.status === 'reviewed' && (
@@ -198,6 +320,13 @@ export default function ApprovePage() {
                     disabled={processingId === item.id}
                   >
                     {processingId === item.id ? "Processing..." : "Reject"}
+                  </button>
+                  <button
+                    onClick={() => deleteRecord(item)}
+                    className="bg-gray-600 text-white px-3 py-2 rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={processingId === item.id}
+                  >
+                    {processingId === item.id ? "Processing..." : "Delete"}
                   </button>
                 </>
               )}
@@ -239,6 +368,20 @@ export default function ApprovePage() {
               </div>
             )}
           </div>
+          
+          {/* User Tracking History */}
+          {formatUserTracking(item).length > 0 && (
+            <div className="border-t pt-4 mt-4">
+              <h4 className="font-medium text-sm text-gray-700 mb-2">Operation History</h4>
+              <div className="space-y-1">
+                {formatUserTracking(item).map((tracking, index) => (
+                  <div key={index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                    {tracking}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           {/* Message History */}
           {(item.submitterMessage || item.reviewerMessage || item.approverMessage) && (

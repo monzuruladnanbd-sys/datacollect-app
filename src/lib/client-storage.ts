@@ -36,30 +36,9 @@ export function getStoredData(): DataRow[] {
     console.error('Error reading from localStorage:', error);
   }
   
-  // Return sample data if nothing stored
-  return [
-    {
-      id: "FM-P-001",
-      section: "Fisheries Management",
-      level: "Project",
-      label: "At-sea patrol missions / vessel inspections",
-      value: "5",
-      unit: "missions",
-      frequency: "Quarterly",
-      period: "2024 Q1",
-      year: "2024",
-      quarter: "Q1",
-      responsible: "Compliance Unit, PMU M&E Specialist",
-      disaggregation: "EEZ, Territorial waters",
-      notes: "Sample data for testing",
-      status: "draft",
-      savedAt: new Date().toISOString(),
-      submitterMessage: "",
-      reviewerMessage: "",
-      approverMessage: "",
-      user: "submitter@example.com"
-    }
-  ];
+  // Return empty array - no sample data to avoid user mismatches
+  console.log('🔄 No localStorage data - starting with empty submissions');
+  return [];
 }
 
 export function saveData(data: DataRow[]): void {
@@ -79,3 +58,11 @@ export function addRow(row: DataRow): void {
   saveData(currentData);
   console.log('Added row to localStorage:', row.id);
 }
+
+
+
+
+
+
+
+

@@ -1,71 +1,89 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import ExcelJS from "exceljs";
-import path from "path";
+import { updateRow, getRowById, updateSpecificRow, type DataRow } from "@/lib/storage";
 
 export async function POST(req: Request) {
-  const { user } = await getSession();
-  if (!user || user.role !== "submitter") {
-    return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
-  }
-  
-  const body = await req.json();
-  const { indicatorId, status, submitterMessage, reviewerMessage, approverMessage } = body;
-  
-  if (!indicatorId || !status) {
-    return NextResponse.json({ ok: false, error: "indicatorId and status required" }, { status: 400 });
-  }
-  
   try {
-    const file = path.join(process.cwd(), "data", "submissions.xlsx");
-    const wb = new ExcelJS.Workbook();
-    
-    try {
-      await wb.xlsx.readFile(file);
-    } catch {
-      return NextResponse.json({ ok: false, error: "File not found" }, { status: 404 });
+    const { user } = await getSession();
+    if (!user || user.role !== "submitter") {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 403 });
     }
-    
-    const ws = wb.getWorksheet("Entries");
-    if (!ws) {
-      return NextResponse.json({ ok: false, error: "Entries sheet not found" }, { status: 404 });
+
+    const body = await req.json();
+    const { 
+      indicatorId, 
+      status, 
+      submitterMessage,
+      value,
+      unit,
+      frequency,
+      period,
+      responsible,
+      disaggregation
+    } = body;
+
+    console.log("Update draft request:", { 
+      indicatorId, 
+      status, 
+      submitterMessage,
+      value,
+      unit,
+      frequency,
+      period,
+      responsible,
+      disaggregation
+    });
+
+    if (!indicatorId || !status) {
+      return NextResponse.json({ ok: false, error: "Missing required fields" }, { status: 400 });
     }
-    
-    // Find the most recent draft with this indicator ID
-    let mostRecentRow = null;
-    let mostRecentTime = null;
-    
-    for (let i = 2; i <= ws.rowCount; i++) {
-      const row = ws.getRow(i);
-      const rowId = row.getCell(1).value?.toString();
-      const rowStatus = row.getCell(14).value?.toString();
-      const rowTime = row.getCell(15).value?.toString();
-      
-      if (rowId === indicatorId && rowStatus === "draft" && rowTime) {
-        const rowDate = new Date(rowTime);
-        if (!mostRecentTime || rowDate > mostRecentTime) {
-          mostRecentRow = row;
-          mostRecentTime = rowDate;
-        }
-      }
+
+    // Find the existing draft record
+    const existingRow = await getRowById(indicatorId);
+    if (!existingRow) {
+      return NextResponse.json({ ok: false, error: "Draft not found" }, { status: 404 });
     }
+
+    console.log("Found existing row:", existingRow);
+
+    // Update the status and message, plus any field values that were provided
+    const currentTimestamp = new Date().toISOString();
+    const updates: Partial<DataRow> = {
+      status: status,
+      submitterMessage: submitterMessage || "",
+      savedAt: currentTimestamp,
+      // Update field values if they were provided
+      ...(value !== undefined && { value }),
+      ...(unit !== undefined && { unit }),
+      ...(frequency !== undefined && { frequency }),
+      ...(period !== undefined && { period }),
+      ...(responsible !== undefined && { responsible }),
+      ...(disaggregation !== undefined && { disaggregation }),
+      // Track user who made the edit
+      editedBy: user.email,
+      editedAt: currentTimestamp,
+      // Track submission if status changed to submitted
+      ...(status === "submitted" && {
+        submittedBy: user.email,
+        submittedAt: currentTimestamp
+      })
+    };
+
+    console.log("Updating row with:", updates);
+
+    // Update the specific row using savedAt to ensure we update the right record
+    const { updateSpecificRow } = await import("@/lib/storage");
+    const updateResult = await updateSpecificRow(indicatorId, existingRow.savedAt, updates);
     
-    if (mostRecentRow) {
-      mostRecentRow.getCell(13).value = mostRecentRow.getCell(13).value; // Keep existing notes
-      mostRecentRow.getCell(14).value = status; // Update status
-      mostRecentRow.getCell(15).value = new Date().toISOString(); // Update timestamp
-      mostRecentRow.getCell(16).value = submitterMessage || mostRecentRow.getCell(16).value; // Update submitter message
-      mostRecentRow.getCell(17).value = reviewerMessage || mostRecentRow.getCell(17).value; // Update reviewer message
-      mostRecentRow.getCell(18).value = approverMessage || mostRecentRow.getCell(18).value; // Update approver message
-    } else {
-      return NextResponse.json({ ok: false, error: "No draft found for this indicator" }, { status: 404 });
+    if (!updateResult) {
+      return NextResponse.json({ ok: false, error: "Failed to update record" }, { status: 500 });
     }
-    
-    await wb.xlsx.writeFile(file);
-    return NextResponse.json({ ok: true });
-    
+
+    console.log("Row updated successfully");
+
+    return NextResponse.json({ ok: true, data: updateResult });
   } catch (error) {
-    console.error("Update draft API error:", error);
-    return NextResponse.json({ ok: false, error: "Failed to update draft" }, { status: 500 });
+    console.error("Update draft error:", error);
+    return NextResponse.json({ ok: false, error: "Internal server error" }, { status: 500 });
   }
 }

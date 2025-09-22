@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { 
-  getAllUsers, 
-  getUserStats, 
-  createUser, 
-  canAddUser,
-  getAvailableRoles 
-} from "@/lib/users";
+import { DatabaseService } from "@/lib/supabase";
+import { getAllUsers, getUserStats } from "@/lib/users";
+import { createUser } from "@/lib/database";
 
 // GET /api/admin/users - Get all users and stats
 export async function GET() {
@@ -16,14 +12,22 @@ export async function GET() {
   }
 
   try {
-    const users = getAllUsers();
-    const stats = getUserStats();
-    const availableRoles = getAvailableRoles();
+    const users = await getAllUsers();
+    const stats = await getUserStats();
+
+    const availableRoles = ['submitter', 'reviewer', 'approver', 'admin'];
 
     return NextResponse.json({
       ok: true,
-      users,
-      stats,
+      users: users || [],
+      stats: {
+        total: stats.totalUsers,
+        active: stats.activeUsers,
+        submitters: stats.submitters,
+        reviewers: stats.reviewers,
+        approvers: stats.approvers,
+        admins: 1, // Only one admin
+      },
       availableRoles,
     });
   } catch (error) {
@@ -51,23 +55,13 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Check if role can be added
-    if (!canAddUser(role)) {
-      return NextResponse.json({ 
-        ok: false, 
-        message: `Cannot add more ${role}s. Limit reached.` 
-      }, { status: 400 });
-    }
+    // TODO: Add role limit checking if needed
 
     // Create user
-    const newUser = createUser({
-      name,
+    const newUser = await createUser({
+      fullName: name,
       email,
-      role,
-      department,
-      phone,
-      password,
-      isActive: true,
+      role: role as 'submitter' | 'reviewer' | 'approver' | 'admin',
     });
 
     return NextResponse.json({

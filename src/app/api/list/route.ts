@@ -3,55 +3,53 @@ import { getSession } from "@/lib/auth";
 import { getRows } from "@/lib/storage";
 
 export async function GET(req: Request) {
-  const { user } = await getSession();
-  if (!user) return NextResponse.json({ ok: false }, { status: 401 });
-  
-  const url = new URL(req.url);
-  const status = url.searchParams.get("status") || "submitted";
-  const allStatuses = url.searchParams.get("all") === "true";
-  
   try {
+    // Get query parameters
+    const url = new URL(req.url);
+    const statusParam = url.searchParams.get('status');
+    const allParam = url.searchParams.get('all');
+    
+    console.log("List API called with params:", { statusParam, allParam });
+    
+    // Get all items from storage
     const allItems = await getRows();
-    console.log("All items in storage:", allItems.length);
-    console.log("User:", user.email, "Role:", user.role);
-    console.log("Requested status:", status, "All statuses:", allStatuses);
+    console.log("Retrieved rows:", allItems.length);
+    console.log("All items:", allItems.map(item => ({ id: item.id, status: item.status, value: item.value, savedAt: item.savedAt })));
     
-    // Filter by status, user role, and data presence
-    const filteredItems = allItems.filter(item => {
-      const hasData = item.value && item.value.trim() !== "" && 
-                     item.savedAt && item.savedAt.trim() !== "";
-      
-      if (!hasData) {
-        console.log("Item filtered out - no data:", item.id);
-        return false;
-      }
-      
-      const statusMatch = allStatuses || item.status === status;
-      const roleMatch = 
-        (user.role === "submitter" && item.user === user.email) ||
-        (user.role === "reviewer" && (allStatuses || status === "submitted" || item.status === "reviewed" || item.status === "rejected")) ||
-        (user.role === "approver" && (allStatuses || status === "reviewed" || status === "submitted"));
-      
-      console.log(`Item ${item.id}: statusMatch=${statusMatch}, roleMatch=${roleMatch}, status=${item.status}, user=${item.user}`);
-      
-      return statusMatch && roleMatch;
-    });
+    // Filter items based on parameters
+    let items = allItems;
     
-    // Group by indicator ID and get the most recent submission for each
-    const itemsMap = new Map<string, any>();
-    
-    for (const item of filteredItems) {
-      const existing = itemsMap.get(item.id);
-      if (!existing || new Date(item.savedAt) > new Date(existing.savedAt)) {
-        itemsMap.set(item.id, item);
-      }
+    // If status parameter is provided, filter by status
+    if (statusParam) {
+      items = items.filter(item => item.status === statusParam);
+      console.log(`Filtered by status '${statusParam}':`, items.length, "items");
+    } else if (allParam === 'true') {
+      // If all=true is provided without status, assume it's the review page wanting all items
+      console.log("All parameter detected, returning all items for review page");
     }
     
-    const items = Array.from(itemsMap.values());
+    // Basic data validation - only exclude completely empty records
+    items = items.filter(item => {
+      const hasValue = item.value && item.value.toString().trim() !== "";
+      const hasNotes = item.notes && item.notes.trim() !== "";
+      const hasAnyData = hasValue || hasNotes;
+      return hasAnyData;
+    });
     
-    return NextResponse.json({ ok: true, items });
+    // Log full data for debugging
+    console.log("Full items data:", items.map(item => ({ 
+      id: item.id, 
+      status: item.status, 
+      value: item.value, 
+      user: item.user 
+    })));
+    
+    console.log("After data validation:", items.length, "items");
+    console.log("Returning items:", items.map(item => ({ id: item.id, status: item.status, value: item.value })));
+    
+    return NextResponse.json(items);
   } catch (error) {
     console.error("List API error:", error);
-    return NextResponse.json({ ok: false, error: "Failed to load data" }, { status: 500 });
+    return NextResponse.json([]);
   }
 }

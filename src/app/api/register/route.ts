@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { registerUser } from "@/lib/users";
+import { sendWelcomeEmail, sendAdminNotification } from "@/lib/email";
 
 export async function POST(req: Request) {
   try {
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
     }
 
     // Register user
-    const result = registerUser({
+    const result = await registerUser({
       name,
       email,
       password,
@@ -32,15 +33,23 @@ export async function POST(req: Request) {
       phone,
     });
 
-    if (result.success) {
+    if (result.success && result.user) {
+      // Send welcome email to the new user
+      const emailResult = await sendWelcomeEmail(result.user.name, result.user.email);
+      
+      // Send notification to admin
+      await sendAdminNotification(result.user.name, result.user.email);
+      
       return NextResponse.json({
         success: true,
         message: result.message,
+        emailSent: emailResult.success,
+        emailMessage: emailResult.message,
         user: {
-          id: result.user?.id,
-          name: result.user?.name,
-          email: result.user?.email,
-          role: result.user?.role,
+          id: result.user.id,
+          name: result.user.name,
+          email: result.user.email,
+          role: result.user.role,
         },
       });
     } else {
@@ -57,4 +66,11 @@ export async function POST(req: Request) {
     }, { status: 500 });
   }
 }
+
+
+
+
+
+
+
 

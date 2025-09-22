@@ -1,6 +1,7 @@
 "use server";
 import { addRow } from "@/lib/storage";
 import { s, a, yearFromPeriod, quarterFromPeriod } from "@/lib/safe";
+import { getSession } from "@/lib/auth";
 
 type RowPayload = {
   id: string;
@@ -19,6 +20,9 @@ type RowPayload = {
 
 export async function saveRows(rows: RowPayload[]) {
   try {
+    // Get current user session
+    const session = await getSession();
+    const currentUser = session.user?.email || "submitter@submit.com";
     const normalized = rows.map((r) => {
       try {
         const period = s(r.period);
@@ -61,7 +65,7 @@ export async function saveRows(rows: RowPayload[]) {
         submitterMessage: "",
         reviewerMessage: "",
         approverMessage: "",
-        user: "system", // Default user for server actions
+        user: currentUser, // Use current logged-in user
       });
     }
 

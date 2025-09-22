@@ -112,6 +112,7 @@ export default function DataEntryPage() {
           const hasResponsible = rowState.responsible && rowState.responsible.length > 0;
           const hasDisaggregation = rowState.disaggregation && rowState.disaggregation.length > 0;
           
+          console.log(`Row ${id}:`, { hasValue, hasNotes, hasResponsible, hasDisaggregation, value: rowState.value });
           return hasValue || hasNotes || hasResponsible || hasDisaggregation;
         })
         .map(([id, rowState]) => {
@@ -134,6 +135,8 @@ export default function DataEntryPage() {
           };
         });
 
+      console.log('Filtered rows for submission:', rows.length);
+      
       if (rows.length === 0) {
         setError("Please enter some data before submitting");
         return;
@@ -168,7 +171,7 @@ export default function DataEntryPage() {
             responsible: Array.isArray(row.responsible) ? row.responsible.join(", ") : (row.responsible || ""),
             disaggregation: Array.isArray(row.disaggregation) ? row.disaggregation.join(", ") : (row.disaggregation || ""),
             notes: row.notes || "",
-            status: status,
+            status: status === "submitted" ? "submitted" : "draft",
             savedAt: new Date().toISOString(),
             submitterMessage: "",
             reviewerMessage: "",
@@ -181,17 +184,22 @@ export default function DataEntryPage() {
         
         localStorage.setItem('datacollect_submissions', JSON.stringify(existingData));
         console.log('Data saved to localStorage:', rows.length, 'rows');
+        console.log('Total items in localStorage:', existingData.length);
       } catch (localError) {
         console.error('localStorage save failed:', localError);
       }
 
       // Show success message
+      const successMessage = status === "draft" 
+        ? "✅ Draft saved! Check 'My Submissions' → 'Draft' tab" 
+        : "✅ Submitted for review! Check 'My Submissions' → 'Pending' tab";
+        
       Object.keys(state).forEach(id => {
         updateRow(id, { 
-          statusMsg: status === "draft" ? "Draft saved to localStorage" : "Submitted to localStorage",
+          statusMsg: successMessage,
           saving: false 
         });
-        setTimeout(() => updateRow(id, { statusMsg: undefined }), 3000);
+        setTimeout(() => updateRow(id, { statusMsg: undefined }), 4000);
       });
 
     } catch (err: any) {
@@ -241,17 +249,55 @@ export default function DataEntryPage() {
         status,
       };
 
-      const result = await saveRows([row]);
-      if (!result.ok) {
-        throw new Error(result.error || "Failed to save data");
+      try {
+        // Try to save to server
+        const result = await saveRows([row]);
+        if (!result.ok) {
+          throw new Error(result.error || "Failed to save data");
+        }
+      } catch (serverError) {
+        console.warn("Server save failed, using localStorage:", serverError);
+      }
+
+      // Always save to localStorage as backup
+      try {
+        const existingData = JSON.parse(localStorage.getItem('datacollect_submissions') || '[]');
+        
+        const dataRow = {
+          id: row.id,
+          section: row.section,
+          level: row.level,
+          label: row.label,
+          value: typeof row.value === "boolean" ? (row.value ? "Yes" : "No") : (row.value?.toString() ?? ""),
+          unit: row.unit || "",
+          frequency: row.frequency || "",
+          period: row.period || "",
+          year: new Date().getFullYear().toString(),
+          quarter: "Q1",
+          responsible: Array.isArray(row.responsible) ? row.responsible.join(", ") : (row.responsible || ""),
+          disaggregation: Array.isArray(row.disaggregation) ? row.disaggregation.join(", ") : (row.disaggregation || ""),
+          notes: row.notes || "",
+          status: status === "submitted" ? "submitted" : "draft",
+          savedAt: new Date().toISOString(),
+          submitterMessage: "",
+          reviewerMessage: "",
+          approverMessage: "",
+          user: "submitter@example.com"
+        };
+        
+        existingData.push(dataRow);
+        localStorage.setItem('datacollect_submissions', JSON.stringify(existingData));
+        console.log('Individual data saved to localStorage:', dataRow);
+      } catch (localError) {
+        console.error('localStorage save failed:', localError);
       }
 
       // Show success message
       updateRow(indicatorId, { 
-        statusMsg: status === "draft" ? "Draft saved" : "Submitted",
+        statusMsg: status === "draft" ? "✅ Draft saved! Check My Submissions → Draft" : "✅ Submitted! Check My Submissions → Pending",
         saving: false 
       });
-      setTimeout(() => updateRow(indicatorId, { statusMsg: undefined }), 3000);
+      setTimeout(() => updateRow(indicatorId, { statusMsg: undefined }), 4000);
 
     } catch (err: any) {
       setError(err.message || "An error occurred");

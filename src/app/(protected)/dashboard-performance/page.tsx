@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { 
   MonthlyDashboard, 
   PerformanceMetric, 
@@ -21,10 +22,37 @@ export default function PerformanceDashboard() {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [userRole, setUserRole] = useState<string>("");
+  const router = useRouter();
 
   useEffect(() => {
-    generateDashboard();
-  }, [selectedPeriod]);
+    checkUserRole();
+  }, []);
+
+  useEffect(() => {
+    if (userRole && userRole !== "submitter") {
+      generateDashboard();
+    }
+  }, [selectedPeriod, userRole]);
+
+  const checkUserRole = async () => {
+    try {
+      const res = await fetch('/api/user/');
+      const userData = await res.json();
+      const role = userData.user?.role;
+      
+      if (role === "submitter") {
+        // Redirect submitters to their submissions page
+        router.push('/submissions');
+        return;
+      }
+      
+      setUserRole(role);
+    } catch (error) {
+      console.error('Failed to check user role:', error);
+      router.push('/login');
+    }
+  };
 
   const generateDashboard = () => {
     setLoading(true);
@@ -83,6 +111,19 @@ export default function PerformanceDashboard() {
   const categories = Array.from(new Set(dashboard?.metrics.map(m => m.category) || []));
   const types = Array.from(new Set(dashboard?.metrics.map(m => m.type) || []));
 
+  // Show loading while checking user role
+  if (!userRole) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading while generating dashboard
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">

@@ -90,6 +90,7 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
+          <Link href="/" className="text-blue-600 hover:text-blue-800 font-medium mb-4 inline-block">🏠 Back to Home</Link>
           <h1 className="text-3xl font-bold text-gray-900">Data Collection System</h1>
           <p className="mt-2 text-sm text-gray-600">Create your submitter account</p>
         </div>

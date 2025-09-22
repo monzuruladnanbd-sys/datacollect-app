@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PROTECTED = [/^\/dashboard/, /^\/entry/, /^\/review/, /^\/approve/];
+const PROTECTED = [/^\/dashboard/, /^\/entry/, /^\/review/, /^\/approve/, /^\/change-password/];
 const SESSION_COOKIE = process.env.SESSION_COOKIE_NAME || "wb_session";
 
 export function middleware(req: NextRequest) {

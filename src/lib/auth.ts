@@ -19,7 +19,7 @@ export function can(user: User | undefined, roles: Role[]) {
 // ---- API route helpers (not server actions) ----
 export async function login(email: string, password: string) {
   const s = await getSession();
-  const user = validateUserCredentials(email, password);
+  const user = await validateUserCredentials(email, password);
   if (!user) return { ok: false, message: "Invalid credentials" };
   
   s.user = { 

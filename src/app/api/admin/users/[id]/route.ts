@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getUserById, updateUser, deactivateUser } from "@/lib/users";
+import { DatabaseService } from "@/lib/supabase";
+import { deleteUser } from "@/lib/users";
 
-// PUT /api/admin/users/[id] - Update user
+// PUT /api/admin/users/[id] - Update user (status, etc.)
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   const { user } = await getSession();
   if (!user || user.role !== "admin") {
@@ -11,36 +12,23 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
   try {
     const body = await req.json();
-    const { name, email, role, department, phone, password } = body;
+    const { is_active, role, full_name, organization, phone } = body;
 
-    const existingUser = getUserById(params.id);
-    if (!existingUser) {
-      return NextResponse.json({ ok: false, message: "User not found" }, { status: 404 });
-    }
+    // Build update object
+    const updates: any = { updated_at: new Date().toISOString() };
+    if (is_active !== undefined) updates.is_active = is_active;
+    if (role) updates.role = role;
+    if (full_name) updates.full_name = full_name;
+    if (organization !== undefined) updates.organization = organization;
+    if (phone !== undefined) updates.phone = phone;
 
-    // Prepare update data
-    const updateData: any = {
-      name,
-      email,
-      role,
-      department,
-      phone,
-    };
-
-    // Only update password if provided
-    if (password && password.trim() !== "") {
-      updateData.passwordHash = password; // In production, hash this
-    }
-
-    const updatedUser = updateUser(params.id, updateData);
-    if (!updatedUser) {
-      return NextResponse.json({ ok: false, message: "Failed to update user" }, { status: 500 });
-    }
+    // Update user in database using DatabaseService
+    const data = await DatabaseService.updateUser(params.id, updates);
 
     return NextResponse.json({
       ok: true,
-      user: updatedUser,
       message: "User updated successfully",
+      user: data
     });
   } catch (error) {
     console.error("Failed to update user:", error);
@@ -48,38 +36,24 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-// DELETE /api/admin/users/[id] - Deactivate user
+// DELETE /api/admin/users/[id] - Delete user
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
-  const { user } = await getSession();
-  if (!user || user.role !== "admin") {
-    return NextResponse.json({ ok: false, message: "Access denied" }, { status: 403 });
-  }
-
   try {
-    const existingUser = getUserById(params.id);
-    if (!existingUser) {
-      return NextResponse.json({ ok: false, message: "User not found" }, { status: 404 });
+    console.log('🗑️ DELETE API endpoint called for user ID:', params.id);
+    
+    const { user } = await getSession();
+    if (!user || user.role !== "admin") {
+      console.log('🗑️ Access denied - user not admin');
+      return NextResponse.json({ ok: false, message: "Access denied" }, { status: 403 });
     }
 
-    // Prevent deactivating yourself
-    if (existingUser.id === user.id) {
-      return NextResponse.json({ 
-        ok: false, 
-        message: "Cannot deactivate your own account" 
-      }, { status: 400 });
-    }
-
-    const success = deactivateUser(params.id);
-    if (!success) {
-      return NextResponse.json({ ok: false, message: "Failed to deactivate user" }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      message: "User deactivated successfully",
-    });
+    console.log('🗑️ Admin access confirmed, calling deleteUser...');
+    const result = await deleteUser(params.id);
+    console.log('🗑️ deleteUser result:', result);
+    
+    return NextResponse.json(result);
   } catch (error) {
-    console.error("Failed to deactivate user:", error);
-    return NextResponse.json({ ok: false, message: "Failed to deactivate user" }, { status: 500 });
+    console.error("🗑️ Failed to delete user:", error);
+    return NextResponse.json({ success: false, message: "Failed to delete user" }, { status: 500 });
   }
 }
